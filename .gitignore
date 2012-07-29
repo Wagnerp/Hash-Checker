@@ -21,6 +21,7 @@ obj/
 # Test Project Results #
 ########################
 TestResults/
+*.vsmdi
 
 # Packages #
 ############

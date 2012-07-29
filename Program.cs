@@ -21,6 +21,7 @@ namespace SHA_1_Hash_Checker
             byte[] fileHash_SHA512 = { };
             byte[] fileHash_MD5 = { };
             string expectedHash = "";
+            string fileToHash = "";
             System.Security.Cryptography.SHA1 SHA1_Hasher = System.Security.Cryptography.SHA1.Create();
             System.Security.Cryptography.SHA512 SHA512_Hasher = System.Security.Cryptography.SHA512.Create();
             System.Security.Cryptography.MD5 MD5_Hasher = System.Security.Cryptography.MD5.Create();
@@ -39,6 +40,7 @@ namespace SHA_1_Hash_Checker
             else
             {
                 ourMode = Modes.FromFile;
+
                 foreach (string arg in args)
                 {
                     if (arg == "/o")
@@ -47,9 +49,7 @@ namespace SHA_1_Hash_Checker
                     }
                     else if (System.IO.File.Exists(arg))
                     {
-                        fileHash_SHA512 = SHA512_Hasher.ComputeHash(System.IO.File.ReadAllBytes(arg));
-                        fileHash_SHA1 = SHA1_Hasher.ComputeHash(System.IO.File.ReadAllBytes(arg));
-                        fileHash_MD5 = MD5_Hasher.ComputeHash(System.IO.File.ReadAllBytes(arg));
+                        fileToHash = arg;
                     }
                 }
                 int i = 0;
@@ -71,18 +71,21 @@ namespace SHA_1_Hash_Checker
             string HashUsed = "";
             if (expectedHash.Length == 32)
             {
+                fileHash_MD5 = MD5_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileToHash));
                 HashUsed = "MD5";
                 foreach (byte chunk in fileHash_MD5)
                     strBuild.Append(chunk.ToString("x2"));
             }
             else if (expectedHash.Length == 40)
             {
+                fileHash_SHA1 = SHA1_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileToHash));
                 HashUsed = "SHA1";
                 foreach (byte chunk in fileHash_SHA1)
                     strBuild.Append(chunk.ToString("x2"));
             }
             else if (expectedHash.Length == 128)
             {
+                fileHash_SHA512 = SHA512_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileToHash));
                 HashUsed = "SHA512";
                 foreach (byte chunk in fileHash_SHA512)
                     strBuild.Append(chunk.ToString("x2"));
