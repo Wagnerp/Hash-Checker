@@ -1,110 +1,116 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using Crypto = System.Security.Cryptography;
 using System.Text;
+using Winforms = System.Windows.Forms;
 
-namespace SHA_1_Hash_Checker
+namespace Hash_Checker
 {
     class Program
     {
-        private enum Modes
+        public enum SupportedHashes
         {
-            FromFile,
-            BrowseForIt
+            // Supported types are stored here by their character-length when encoded as a hex string
+            MD5 = 32,
+            SHA1 = 40,
+            SHA512 = 128
         }
 
         [STAThreadAttribute]
         static void Main(string[] args)
         {
-            Modes ourMode = 0;
-            byte[] fileHash_SHA1 = { };
-            byte[] fileHash_SHA512 = { };
-            byte[] fileHash_MD5 = { };
             string expectedHash = "";
             string fileToHash = "";
-            System.Security.Cryptography.SHA1 SHA1_Hasher = System.Security.Cryptography.SHA1.Create();
-            System.Security.Cryptography.SHA512 SHA512_Hasher = System.Security.Cryptography.SHA512.Create();
-            System.Security.Cryptography.MD5 MD5_Hasher = System.Security.Cryptography.MD5.Create();
 
+            // Don't run if we don't have any arguments
             if (args.Length == 0)
             {
-                ourMode = Modes.BrowseForIt;
-                System.Windows.Forms.OpenFileDialog fileBrowser = new System.Windows.Forms.OpenFileDialog();
-                fileBrowser.ShowDialog();
-                fileHash_SHA1 = SHA1_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileBrowser.FileName));
-                fileHash_MD5 = MD5_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileBrowser.FileName));
-
-                Console.WriteLine("What's the Hash we're comparing to?");
-                expectedHash = Console.ReadLine();
+                Console.WriteLine("Please copy the checksum to your clipboard, and then call Hash-Checker with the context menu for the file you're verifying.");
+                Console.ReadKey();
+                return;
             }
             else
             {
-                ourMode = Modes.FromFile;
-
                 foreach (string arg in args)
                 {
-                    if (arg == "/o")
-                    {
-                        ourMode = Modes.FromFile;
-                    }
-                    else if (System.IO.File.Exists(arg))
-                    {
+                    if (System.IO.File.Exists(arg))
                         fileToHash = arg;
-                    }
                 }
-                int i = 0;
-                do
+                // Don't continue if we have no valid file to check against
+                if (fileToHash == "")
                 {
-                    int textLength = System.Windows.Forms.Clipboard.GetText().Length;
-                    if (System.Windows.Forms.Clipboard.ContainsText() && (textLength == 40 || textLength == 32 || textLength == 128))
-                        break;
-                    Console.WriteLine("Please select and copy the hash to compare the file to.");
-                    Console.ReadLine();
-                    i++;
-                } while (i < 5);
-                if (i == 5)
+                    Console.WriteLine("No files were passed as arguments.");
+                    Console.WriteLine("Please call Hash-Checker with the context menu for the file you're verifying.");
+                    Console.ReadKey();
                     return;
-                expectedHash = System.Windows.Forms.Clipboard.GetText().ToLower();
+                }
+                // Check the clipboard for a checksum we can use
+                if (!checkClipboard(ref expectedHash))
+                    return;
             }
-
-            StringBuilder strBuild = new StringBuilder();
             string HashUsed = "";
-            if (expectedHash.Length == 32)
+            Crypto.HashAlgorithm hashGenerator;
+            byte[] hashbytes;
+            if (expectedHash.Length == (int)SupportedHashes.MD5)
             {
-                fileHash_MD5 = MD5_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileToHash));
+                hashGenerator = Crypto.MD5.Create();
                 HashUsed = "MD5";
-                foreach (byte chunk in fileHash_MD5)
-                    strBuild.Append(chunk.ToString("x2"));
             }
-            else if (expectedHash.Length == 40)
+            else if (expectedHash.Length == (int)SupportedHashes.SHA1)
             {
-                fileHash_SHA1 = SHA1_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileToHash));
+                hashGenerator = Crypto.SHA1.Create();
                 HashUsed = "SHA1";
-                foreach (byte chunk in fileHash_SHA1)
-                    strBuild.Append(chunk.ToString("x2"));
             }
-            else if (expectedHash.Length == 128)
+            else if (expectedHash.Length == (int)SupportedHashes.SHA512)
             {
-                fileHash_SHA512 = SHA512_Hasher.ComputeHash(System.IO.File.ReadAllBytes(fileToHash));
+                hashGenerator = Crypto.SHA512.Create();
                 HashUsed = "SHA512";
-                foreach (byte chunk in fileHash_SHA512)
-                    strBuild.Append(chunk.ToString("x2"));
             }
             else
             {
-                Console.WriteLine("Input hash is not a supported hash.");
+                Console.WriteLine("Input hash type is not supported.");
                 Console.ReadLine();
                 return;
             }
-            if (strBuild.ToString().ToLower() == expectedHash.ToLower())
-                Console.WriteLine("They match!");
+            // Make the checksum and build it into the StringBuilder as hex
+            StringBuilder checksumBuilder = new StringBuilder();
+            hashbytes = hashGenerator.ComputeHash(System.IO.File.ReadAllBytes(fileToHash));
+            foreach (byte chunk in hashbytes) checksumBuilder.Append(chunk.ToString("x2"));
+            // Check the values
+            if (checksumBuilder.ToString().ToLower() == expectedHash.ToLower())
+                Console.WriteLine("Hash provided matches calculated hash.");
             else
-                Console.WriteLine("They don't match!");
+                Console.WriteLine("Hash provided DOES NOT match calculated hash.");
             Console.WriteLine("Hash Method: " + HashUsed);
             Console.WriteLine();
             Console.WriteLine("Expected Hash: " + expectedHash.ToLower());
-            Console.WriteLine("Result Hash:   " + strBuild.ToString().ToLower());
+            Console.WriteLine("Result Hash:   " + checksumBuilder.ToString().ToLower());
             Console.ReadLine();
+        }
+
+        private static bool checkClipboard(ref string expectedHash)
+        {
+            do
+            {
+                if (Winforms.Clipboard.ContainsText())
+                {
+                    // Grab clipboard text
+                    expectedHash = Winforms.Clipboard.GetText();
+                    // Check for quit or just q
+                    if (expectedHash == "quit" || expectedHash == "q")
+                        return false;
+                    // See if the length matches any supported hash types
+                    foreach (SupportedHashes hashType in Enum.GetValues(typeof(SupportedHashes)))
+                    {
+                        if (expectedHash.Length == (int)hashType)
+                            return true;
+                    }
+                    // If no matches, clear our value
+                    expectedHash = "";
+                }
+                // Let the user know to copy the hash
+                Console.WriteLine("Please select and copy the hash to compare the file to.");
+                Console.ReadLine();
+            } while (true);
         }
     }
 }
