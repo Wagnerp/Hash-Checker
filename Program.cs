@@ -107,7 +107,7 @@ namespace Hash_Checker
             string lastInput = "";
             do
             {
-                if (Winforms.Clipboard.ContainsText())
+                if (Winforms.Clipboard.ContainsText() || lastInput != "")
                 {
                     // Grab clipboard text
                     expectedHash = Winforms.Clipboard.GetText();
